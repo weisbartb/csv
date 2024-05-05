@@ -10,6 +10,7 @@ import (
 // This is a wrapper for nullable values to exist and easier to work with that something like sql.Null.
 type NullableField[T any] []T
 
+// UnmarshalCSV allows for a NullableField to be unmarshalled and its underlying type to be resolved if not null.
 func (n *NullableField[T]) UnmarshalCSV(data string) error {
 	var blank T
 	if len(data) == 0 {
@@ -28,6 +29,7 @@ func (n *NullableField[T]) UnmarshalCSV(data string) error {
 	return nil
 }
 
+// MarshalCSV marshals the underlying type for a CSV.
 func (n NullableField[T]) MarshalCSV() (string, error) {
 	if len(n) == 0 {
 		return "", nil
@@ -36,10 +38,12 @@ func (n NullableField[T]) MarshalCSV() (string, error) {
 	return getEncoderProvider(vOf.Type(), false)(vOf)
 }
 
+// IsNull checks to see if the field is null or a value was set.
 func (n NullableField[T]) IsNull() bool {
 	return len(n) == 0
 }
 
+// Set updates the nullable field value.
 func (n *NullableField[T]) Set(val T) {
 	if len(*n) > 0 {
 		slc := *n
@@ -49,6 +53,17 @@ func (n *NullableField[T]) Set(val T) {
 	tmp := NullableField[T]{val}
 	*n = tmp
 }
+
+// Unset sets the field to null.
+func (n *NullableField[T]) Unset() {
+	if len(*n) == 0 {
+		return
+	}
+	tmp := NullableField[T]{}
+	*n = tmp
+}
+
+// Get returns the value and if it was set or not.
 func (n NullableField[T]) Get() (T, bool) {
 	var e T
 	if len(n) == 0 {

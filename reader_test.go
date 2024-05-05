@@ -2,7 +2,6 @@ package csv
 
 import (
 	"embed"
-	"encoding/csv"
 	"testing"
 
 	testifyrequire "github.com/stretchr/testify/require"
@@ -34,9 +33,7 @@ func TestNewStructuredCSVReader(t *testing.T) {
 
 	fh, err := testData.Open("testdata/simple.csv")
 	require.NoError(err)
-	csvReader := csv.NewReader(fh)
-	reader, err := NewStructuredCSVReader[simpleCSVRecord](csvReader)
-	require.NoError(err)
+	reader := NewStructuredCSVReader[simpleCSVRecord](fh)
 	require.NotNil(reader)
 }
 
@@ -45,9 +42,7 @@ func TestReader_Next(t *testing.T) {
 		require := testifyrequire.New(t)
 		fh, err := testData.Open("testdata/simple.csv")
 		require.NoError(err)
-		csvReader := csv.NewReader(fh)
-		reader, err := NewStructuredCSVReader[simpleCSVRecord](csvReader)
-		require.NoError(err)
+		reader := NewStructuredCSVReader[simpleCSVRecord](fh)
 		record, err := reader.Next()
 		require.NoError(err)
 		require.NotEmpty(record)
@@ -59,9 +54,7 @@ func TestReader_Next(t *testing.T) {
 	t.Run("strict mode", func(t *testing.T) {
 		require := testifyrequire.New(t)
 		fh, err := testData.Open("testdata/simple.csv")
-		require.NoError(err)
-		csvReader := csv.NewReader(fh)
-		reader, err := NewStructuredCSVReader[simpleCSVRecordStrictFail](csvReader)
+		reader := NewStructuredCSVReader[simpleCSVRecordStrictFail](fh)
 		reader.StrictMode = true
 		require.NoError(err)
 		_, err = reader.Next()
@@ -71,9 +64,7 @@ func TestReader_Next(t *testing.T) {
 		require := testifyrequire.New(t)
 		fh, err := testData.Open("testdata/simple-required.csv")
 		require.NoError(err)
-		csvReader := csv.NewReader(fh)
-		reader, err := NewStructuredCSVReader[requiredCSVRecordStrictFail](csvReader)
-		require.NoError(err)
+		reader := NewStructuredCSVReader[requiredCSVRecordStrictFail](fh)
 		record, err := reader.Next()
 		require.NoError(err)
 		require.Equal(false, record.ABool)
@@ -85,9 +76,8 @@ func TestReader_Next(t *testing.T) {
 		require := testifyrequire.New(t)
 		fh, err := testData.Open("testdata/simple-required.csv")
 		require.NoError(err)
-		csvReader := csv.NewReader(fh)
-		reader, err := NewStructuredCSVReader[requiredCSVRecordStrictFail](csvReader)
-		require.NoError(err)
+		reader := NewStructuredCSVReader[requiredCSVRecordStrictFail](fh)
+
 		_, _ = reader.Next()
 		_, err = reader.Next()
 		require.EqualError(err, "an_int is a required field")

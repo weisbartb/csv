@@ -2,30 +2,29 @@ package csv
 
 import (
 	"encoding/csv"
-	"errors"
 	"fmt"
+	"io"
 	"reflect"
 
 	"github.com/weisbartb/stack"
 )
 
-type HeaderKey string
-type Field struct {
-	id     int
-	ignore bool
-	t      reflect.Kind
-}
+// Reader holds the state of a CSV reader and binds it to a given record type.
+// Record can be any struct
 type Reader[Record any] struct {
 	// StrictMode will error on any unhandled fields seen in the CSV
 	StrictMode bool
-	reader     *csv.Reader
+	// reader holds the underlying CSV reader
+	reader *csv.Reader
+	// currentRow holds the current row for reporting problematic rows
 	currentRow int
+	// headerRead activates after the header gets parsed the first time
 	headerRead bool
-	headerMap  map[string]int
-	headers    []string
+	// headerMap stores the position of all header keys
+	headerMap map[string]int
+	// headers contain a list of all header values.
+	headers []string
 }
-
-var ErrMissingRecord = errors.New("a valid record type is required")
 
 func (r *Reader[Record]) readHeader() error {
 	if r.headerRead {
@@ -45,19 +44,18 @@ func (r *Reader[Record]) readHeader() error {
 	return nil
 }
 
-func (r *Reader[Record]) initialize(emptyRecord any) error {
+// initialize initializes the reader
+func (r *Reader[Record]) initialize() error {
+	var t Record
 	err := r.readHeader()
 	if err != nil {
 		return stack.Trace(err)
 	}
-	if emptyRecord == nil {
-		return stack.Trace(ErrMissingRecord)
-	}
-	tOf := reflect.TypeOf(emptyRecord)
+	tOf := reflect.TypeOf(t)
 	// Warm up cache
 	instructions := fieldCache.GetTypeDataFor(tOf)
 	if r.StrictMode {
-		// See if any fields that
+		// StrictMode will error for any field that can't be found in the struct
 		for _, v := range r.headers {
 			if instructions.GetFieldByName(v) == nil {
 				return stack.Trace(fmt.Errorf("%v was seen in the csv but not in the record provided", v))
@@ -67,6 +65,7 @@ func (r *Reader[Record]) initialize(emptyRecord any) error {
 	return nil
 }
 
+// nextRow is a helper method to get the next row and wrap errors with the row that failed
 func (r *Reader[Record]) nextRow() (record []string, err error) {
 	record, err = r.reader.Read()
 	if err == nil {
@@ -77,45 +76,50 @@ func (r *Reader[Record]) nextRow() (record []string, err error) {
 	return
 }
 
+// Next gets the next Record in the file.
+// This will return a valid Record or an error.
+// This can return io.EOF which is a valid control signal to stop the loop.
 func (r *Reader[Record]) Next() (Record, error) {
 	var out Record
 	if !r.headerRead {
-		if err := r.initialize(out); err != nil {
+		if err := r.initialize(); err != nil {
 			return out, stack.Trace(err)
 		}
 	}
+	// Load the row
 	row, err := r.nextRow()
 	if err != nil {
 		return out, stack.Trace(err)
 	}
 	vOf := reflect.ValueOf(&out)
 	tData := vOf.Elem()
+	// Grab the instruction set for the current field
 	instructionSet := fieldCache.GetTypeDataFor(reflect.TypeOf(out))
 	for cellOffset, cell := range row {
 		fieldData := instructionSet.GetFieldByName(r.headers[cellOffset])
+		// fieldData is nil if the field is ignored or unrecognized.
 		if fieldData == nil {
 			continue
 		}
 		var isNull bool
 		if len(cell) == 0 {
+			// Set the isNull flag for the decoder
 			isNull = true
-		}
-		endOfBlock := len(cell) - 1
-		if len(cell) > 2 && (cell[0] == '"' && cell[endOfBlock] == '"') {
-			cell = cell[1:endOfBlock]
 		}
 		val, err := fieldData.InstructionData().GetDecoder()(cell, isNull)
 		if err != nil {
 			return out, stack.Trace(err)
 		}
+		// Set the value on the field
 		tData.Field(fieldData.Idx).Set(reflect.ValueOf(val))
 	}
 	return out, nil
 }
 
-func NewStructuredCSVReader[Record any](csvFileHandler *csv.Reader) (*Reader[Record], error) {
+// NewStructuredCSVReader sets up a new reader for a given file handle.
+func NewStructuredCSVReader[Record any](fileHandle io.Reader) *Reader[Record] {
 	wrapper := &Reader[Record]{
-		reader: csvFileHandler,
+		reader: csv.NewReader(fileHandle),
 	}
-	return wrapper, nil
+	return wrapper
 }

@@ -45,7 +45,7 @@ func (c *Writer[Record]) writeHeader() error {
 	var columns []string
 	var rec Record
 	for _, field := range fieldCache.GetTypeDataFor(reflect.TypeOf(rec)).Fields() {
-		columns = append(columns, field.InstructionData().GetExportedFieldName())
+		columns = append(columns, field.InstructionData().GetCSVHeaderIdentifier())
 	}
 	if err := c.w.Write(columns); err != nil {
 		return stack.Trace(err)
