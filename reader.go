@@ -6,6 +6,7 @@ import (
 	"io"
 	"reflect"
 
+	"github.com/weisbartb/rcache"
 	"github.com/weisbartb/stack"
 )
 
@@ -24,6 +25,8 @@ type Reader[Record any] struct {
 	headerMap map[string]int
 	// headers contain a list of all header values.
 	headers []string
+	// instruction holds a cached copy of the record instruction
+	instruction *rcache.FieldCache[csvInstruction]
 }
 
 func (r *Reader[Record]) readHeader() error {
@@ -93,10 +96,9 @@ func (r *Reader[Record]) Next() (Record, error) {
 	}
 	vOf := reflect.ValueOf(&out)
 	tData := vOf.Elem()
-	// Grab the instruction set for the current field
-	instructionSet := fieldCache.GetTypeDataFor(reflect.TypeOf(out))
+
 	for cellOffset, cell := range row {
-		fieldData := instructionSet.GetFieldByName(r.headers[cellOffset])
+		fieldData := r.instruction.GetFieldByName(r.headers[cellOffset])
 		// fieldData is nil if the field is ignored or unrecognized.
 		if fieldData == nil {
 			continue
@@ -118,8 +120,10 @@ func (r *Reader[Record]) Next() (Record, error) {
 
 // NewStructuredCSVReader sets up a new reader for a given file handle.
 func NewStructuredCSVReader[Record any](fileHandle io.Reader) *Reader[Record] {
+	var T Record
 	wrapper := &Reader[Record]{
-		reader: csv.NewReader(fileHandle),
+		reader:      csv.NewReader(fileHandle),
+		instruction: fieldCache.GetTypeDataFor(reflect.TypeOf(T)),
 	}
 	return wrapper
 }

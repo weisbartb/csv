@@ -2,7 +2,6 @@ package csv
 
 import (
 	"bytes"
-	"encoding/csv"
 	"testing"
 
 	testifyrequire "github.com/stretchr/testify/require"
@@ -26,8 +25,7 @@ func TestNewWriter(t *testing.T) {
 	t.Run("Basic writer", func(t *testing.T) {
 		require := testifyrequire.New(t)
 		buf := bytes.Buffer{}
-		csvWriter := csv.NewWriter(&buf)
-		writer := NewWriter[testWriterStruct](csvWriter)
+		writer := NewWriter[testWriterStruct](&buf)
 		err := writer.WriteRecord(testWriterStruct{
 			Email:      "test@example.com",
 			Age:        32,
@@ -40,8 +38,7 @@ func TestNewWriter(t *testing.T) {
 	t.Run("Omit Empty", func(t *testing.T) {
 		require := testifyrequire.New(t)
 		buf := bytes.Buffer{}
-		csvWriter := csv.NewWriter(&buf)
-		writer := NewWriter[testWriterStruct](csvWriter)
+		writer := NewWriter[testWriterStruct](&buf)
 		err := writer.WriteRecord(testWriterStruct{
 			Email:      "test@example.com",
 			Age:        32,
